@@ -1,0 +1,3 @@
+server.port: 8090
+
+spring.cloud.config.server.git.uri: 'C:\Users\ddissnayake\eclipse-workspace\groovy-inventory\config-repository'

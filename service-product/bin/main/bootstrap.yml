@@ -1,0 +1,5 @@
+spring:
+  application.name: service-product
+  cloud.config.discovery:
+    enabled: true
+    serviceId: service-config

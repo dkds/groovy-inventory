@@ -1,0 +1,12 @@
+jar {
+    baseName = 'common-library-1'
+    version = '0.0.1-SNAPSHOT'
+}
+
+bootJar.enabled = false
+jar.enabled = true
+
+dependencies {
+    compile('org.springframework.boot:spring-boot-starter-json')
+    compile('org.springframework.boot:spring-boot-starter-data-mongodb')
+}

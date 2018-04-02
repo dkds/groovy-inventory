@@ -1,0 +1,116 @@
+import static groovy.io.FileType.FILES
+
+buildscript {
+	ext {
+		springBootVersion = '2.0.0.RELEASE'
+        springCloudVersion = 'Finchley.M8'
+	}
+	repositories {
+		mavenCentral()
+		maven { url "https://plugins.gradle.org/m2/" }
+	}
+	dependencies {
+		classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
+		classpath("gradle.plugin.com.dorongold.plugins:task-tree:1.3")
+	}
+}
+def services = [ 
+    'common-library': [ excludeCommon: true, discoverable: false, runnable: false ],
+    'service-config': [ excludeCommon: true, discoverable: true, runnable: true, startTime: 20, depends: 'service-eureka' ], 
+    'service-eureka': [ excludeCommon: true, discoverable: false, runnable: true, startTime: 15 ],  
+    'service-gateway': [ excludeCommon: true, discoverable: true, runnable: true, startTime: -1, depends: 'service-config' ], 
+    'service-product': [ excludeCommon: false, discoverable: true, runnable: true, startTime: -1, depends: 'service-config' ], 
+    'service-supplier': [ excludeCommon: false, discoverable: true, runnable: true, startTime: -1, depends: 'service-config' ], 
+    'service-customer': [ excludeCommon: false, discoverable: true, runnable: true, startTime: -1, depends: 'service-config' ], 
+    'service-stock': [ excludeCommon: false, discoverable: true, runnable: true, startTime: -1, depends: 'service-config' ], 
+    'service-invoice': [ excludeCommon: false, discoverable: true, runnable: true, startTime: -1, depends: 'service-stock' ], 
+]
+
+services.findAll { it.value.runnable }.each { service ->
+    service.value.taskName = "start-${service.key}"
+    tasks.create(name: service.value.taskName, group: 'application', description: "Run ${service.key} jar file", dependsOn: ":${service.key}:build") {
+        doLast{
+            def buildDir = project(":${service.key}").buildDir;
+            new File("$buildDir/libs").eachFileRecurse(FILES) {
+                if (it.name.startsWith('inventory') && it.name.endsWith('.jar')) {
+                    println "starting ${service.key} (${it.name})"
+                    new ProcessBuilder(['cmd.exe', '/c', 'start', 'java', '-jar', it.absolutePath])
+                        .start()
+                    if (service.value.startTime > 0) {
+                        sleep(service.value.startTime * 1000)
+                    }
+                }
+            }
+        }
+    }
+}
+
+task startInventory(dependsOn: 'build') {
+    group 'application'
+    description 'Run all services'
+    doLast{
+        println 'done'
+    }
+}
+
+services.findAll { it.value.runnable }.each { service ->
+    if (service.value.depends) {
+        service.value.depends.tokenize().each {
+            tasks[ service.value.taskName ].dependsOn services[it].taskName
+        }
+    }
+    startInventory.dependsOn service.value.taskName
+}
+
+group = 'com.test'
+version = '0.0.1-SNAPSHOT'
+
+apply plugin: "java-base"
+apply plugin: "com.dorongold.task-tree"
+
+subprojects { pr ->
+
+    apply plugin: 'groovy'
+    apply plugin: 'eclipse'
+    apply plugin: 'io.spring.dependency-management'
+    apply plugin: 'org.springframework.boot'
+    
+    repositories {
+        mavenCentral()
+        maven { url "https://repo.spring.io/milestone" }
+        jcenter()
+    }
+        
+    sourceCompatibility = 1.8    
+    ext {
+        springCloudVersion = 'Finchley.M8'
+    }
+
+    dependencyManagement {
+        imports {
+            mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+        }
+    }
+    
+    dependencies {
+        compile('org.codehaus.groovy:groovy')
+        
+        if (!services[pr.name].excludeCommon) {
+            compile(project(':common-library')) { transitive = false } 
+            compile('org.springframework.cloud:spring-cloud-starter-netflix-ribbon')
+            compile('org.springframework.boot:spring-boot-starter-actuator')
+        }
+        if (services[pr.name].discoverable) {
+            compile('org.springframework.cloud:spring-cloud-starter-netflix-eureka-client')
+            compile('org.springframework.cloud:spring-cloud-starter-netflix-hystrix')
+        } else {
+            compile('org.springframework.cloud:spring-cloud-starter-config')        
+        }
+
+        
+        testCompile('org.springframework.boot:spring-boot-starter-test')
+        testCompile('org.spockframework:spock-core:1.1-groovy-2.4')
+        testCompile('org.spockframework:spock-spring:1.1-groovy-2.4')
+    }
+}
+

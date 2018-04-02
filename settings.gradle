@@ -1,0 +1,14 @@
+
+rootProject.name = 'groovy-inventory'
+
+include 'common-library'
+
+include 'service-config'
+include 'service-eureka'
+include 'service-gateway'
+
+include 'service-product'
+include 'service-customer'
+include 'service-supplier'
+include 'service-stock'
+include 'service-invoice'
